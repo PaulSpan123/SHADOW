@@ -405,12 +405,13 @@ if not filtered.empty:
     
     if show_vessels and not filtered.empty:
         # Scale radius by risk level
-        risk_radius = filtered["risk"].map({"CRITICAL": 80000, "HIGH": 60000, "MEDIUM": 40000, "LOW": 30000})
+        vessel_data = filtered.copy()
+        vessel_data["radius"] = vessel_data["risk"].map({"CRITICAL": 80000, "HIGH": 60000, "MEDIUM": 40000, "LOW": 30000})
         
         layers.append(pdk.Layer(
-            "ScatterplotLayer", data=filtered,
+            "ScatterplotLayer", data=vessel_data,
             get_position=["lon","lat"], get_color="color",
-            get_radius=risk_radius,
+            get_radius="radius",
             radius_min_pixels=5, radius_max_pixels=20,
             pickable=True, opacity=0.85, stroked=True,
             line_width_min_pixels=1, get_line_color=[255,255,255,120],
@@ -433,10 +434,13 @@ if not filtered.empty:
         ))
     
     if show_heat and not filtered.empty:
+        heat_data = filtered.copy()
+        heat_data["weight"] = heat_data["risk"].map({"CRITICAL":4,"HIGH":3,"MEDIUM":2,"LOW":1})
+        
         layers.append(pdk.Layer(
-            "HeatmapLayer", data=filtered,
+            "HeatmapLayer", data=heat_data,
             get_position=["lon","lat"],
-            get_weight=filtered["risk"].map({"CRITICAL":4,"HIGH":3,"MEDIUM":2,"LOW":1}).tolist(),
+            get_weight="weight",
             radiusPixels=60, intensity=1.2, threshold=0.05, opacity=0.5,
         ))
     
