@@ -8,10 +8,8 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import pydeck as pdk
 import random
 import time
-import os
 import folium
 from streamlit_folium import st_folium
 from datetime import datetime, timedelta
@@ -363,30 +361,6 @@ st.markdown("---")
 # ══════════════════════════════════════════════════════════════════════════════
 st.markdown('<div class="section-header">GLOBAL VESSEL INTELLIGENCE MAP</div>', unsafe_allow_html=True)
 
-if show_vessels and not filtered.empty:
-    layers.append(pdk.Layer(
-        "ScatterplotLayer", data=filtered,
-        get_position=["lon","lat"], get_color="color",
-        get_radius=35000, radius_min_pixels=4, radius_max_pixels=18,
-        pickable=True, opacity=0.85, stroked=True,
-        line_width_min_pixels=1, get_line_color=[255,255,255,120],
-    ))
-
-if show_sat_pings and not sat_df.empty:
-    sat_f = sat_df[sat_df["vessel_id"].isin(filtered["vessel_id"])]
-    layers.append(pdk.Layer(
-        "ScatterplotLayer", data=sat_f,
-        get_position=["sat_lon","sat_lat"], get_color=[180,100,255,160],
-        get_radius=25000, radius_min_pixels=3, radius_max_pixels=10,
-        pickable=True, opacity=0.7, stroked=True,
-        line_width_min_pixels=1, get_line_color=[220,180,255,200],
-    ))
-
-if show_sts and not sts_df.empty:
-    sts_f = sts_df[sts_df["vessel_id"].isin(filtered["vessel_id"])].copy()
-    sts_f["target_lat"] = sts_f["lat"] + np.random.normal(0, 0.3, len(sts_f))
-    sts_f["target_lon"] = sts_f["lon"] + np.random.normal(0, 0.3, len(sts_f))
-
 # ── BUILD FOLIUM MAP ──────────────────────────────────────────────────────────
 m = folium.Map(location=[27.0, 45.0], zoom_start=3, tiles="CartoDB dark_matter")
 
@@ -452,6 +426,7 @@ if show_sts and not sts_df.empty:
         ).add_to(m)
 
 st_folium(m, width=1400, height=600)
+st.caption("Red = Critical Risk | Orange = High/STS | Yellow = Medium | Green = Low | Purple = Satellite")
 st.markdown("---")
 
 # ══════════════════════════════════════════════════════════════════════════════
