@@ -10,7 +10,6 @@ import pandas as pd
 import numpy as np
 import random
 import time
-import altair as alt
 from datetime import datetime, timedelta
 
 # ── PAGE CONFIG ───────────────────────────────────────────────────────────────
@@ -361,39 +360,48 @@ st.markdown("---")
 st.markdown('<div class="section-header">GLOBAL VESSEL INTELLIGENCE MAP</div>', unsafe_allow_html=True)
 
 if not filtered.empty:
-    # Prepare map data
-    map_data = filtered[["lat", "lon", "vessel_name", "risk", "flag", "speed_kn", 
-                         "imo", "mmsi", "type", "region"]].copy()
+    # Prepare data for Streamlit map
+    map_data = pd.DataFrame()
+    map_data['latitude'] = filtered['lat']
+    map_data['longitude'] = filtered['lon']
     
-    # Create interactive scatter chart using Altair
-    chart = alt.Chart(map_data).mark_circle(size=150, opacity=0.8).encode(
-        x=alt.X('lon:Q', title='Longitude', scale=alt.Scale(domain=[0, 120])),
-        y=alt.Y('lat:Q', title='Latitude', scale=alt.Scale(domain=[-10, 70])),
-        color=alt.Color('risk:N', 
-            scale=alt.Scale(
-                domain=['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'],
-                range=['#ff2828', '#ff8c00', '#ffd200', '#3cdc64']
-            ), 
-            title='Risk Level'
-        ),
-        tooltip=[
-            alt.Tooltip('vessel_name:N', title='Vessel'),
-            alt.Tooltip('risk:N', title='Risk'),
-            alt.Tooltip('flag:N', title='Flag'),
-            alt.Tooltip('type:N', title='Type'),
-            alt.Tooltip('speed_kn:Q', title='Speed (kn)'),
-            alt.Tooltip('imo:N', title='IMO'),
-            alt.Tooltip('mmsi:N', title='MMSI'),
-            alt.Tooltip('region:N', title='Region'),
-        ]
-    ).properties(
-        width=1000,
-        height=600,
-        title='Global Vessel Intelligence Map — Hover for details'
-    ).interactive()
+    # Add vessel details as columns for display
+    map_data['vessel_name'] = filtered['vessel_name']
+    map_data['risk'] = filtered['risk']
+    map_data['flag'] = filtered['flag']
+    map_data['type'] = filtered['type']
+    map_data['speed_kn'] = filtered['speed_kn']
+    map_data['imo'] = filtered['imo']
+    map_data['mmsi'] = filtered['mmsi']
+    map_data['region'] = filtered['region']
     
-    st.altair_chart(chart, use_container_width=True)
-    st.caption(f"📍 {len(map_data)} vessels tracked | 🔴 Critical | 🟠 High | 🟡 Medium | 🟢 Low | Hover for full details")
+    # Display map with built-in Streamlit functionality
+    st.map(map_data, zoom=2, use_container_width=True)
+    
+    # Show vessel details table below map
+    st.subheader("📋 Vessel Details")
+    
+    # Create a summary table with key info
+    detail_cols = ['vessel_name', 'risk', 'flag', 'type', 'speed_kn', 'imo', 'region']
+    display_data = filtered[detail_cols].copy()
+    display_data = display_data.rename(columns={
+        'vessel_name': 'Vessel',
+        'risk': 'Risk',
+        'flag': 'Flag',
+        'type': 'Type',
+        'speed_kn': 'Speed (kn)',
+        'imo': 'IMO',
+        'region': 'Region'
+    })
+    
+    # Color code risk levels
+    st.dataframe(
+        display_data.sort_values('Risk', key=lambda x: x.map({'CRITICAL': 0, 'HIGH': 1, 'MEDIUM': 2, 'LOW': 3})),
+        use_container_width=True,
+        height=400
+    )
+    
+    st.caption(f"📍 {len(map_data)} vessels tracked | 🔴 Critical | 🟠 High | 🟡 Medium | 🟢 Low")
 else:
     st.info("No vessels match current filters")
 st.markdown("---")
