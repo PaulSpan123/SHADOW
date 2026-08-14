@@ -417,8 +417,8 @@ if not filtered.empty:
         ))
         
         # Label top 20 highest risk vessels
-        top_20 = filtered.nlargest(20, "risk").sort_values("risk", 
-            key=lambda x: x.map({"CRITICAL":0,"HIGH":1,"MEDIUM":2,"LOW":3}))
+        top_20 = filtered.sort_values("risk", 
+            key=lambda x: x.map({"CRITICAL":0,"HIGH":1,"MEDIUM":2,"LOW":3})).head(20)
         
         layers.append(pdk.Layer(
             "TextLayer", data=top_20,
