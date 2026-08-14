@@ -365,43 +365,35 @@ if not filtered.empty:
     map_data = filtered[["lat", "lon", "vessel_name", "risk", "flag", "speed_kn", 
                          "imo", "mmsi", "type", "region"]].copy()
     
-    # Risk color mapping
-    risk_colors = {
-        "CRITICAL": "#ff2828",
-        "HIGH": "#ff8c00", 
-        "MEDIUM": "#ffd200",
-        "LOW": "#3cdc64"
-    }
-    map_data["color"] = map_data["risk"].map(risk_colors)
-    
     # Create interactive scatter chart using Altair
-    chart = alt.Chart(map_data).mark_circle(size=100).encode(
-        longitude='lon:Q',
-        latitude='lat:Q',
-        color=alt.Color('risk:N', scale=alt.Scale(
-            domain=['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'],
-            range=['#ff2828', '#ff8c00', '#ffd200', '#3cdc64']
-        ), title='Risk Level'),
+    chart = alt.Chart(map_data).mark_circle(size=150, opacity=0.8).encode(
+        x=alt.X('lon:Q', title='Longitude', scale=alt.Scale(domain=[0, 120])),
+        y=alt.Y('lat:Q', title='Latitude', scale=alt.Scale(domain=[-10, 70])),
+        color=alt.Color('risk:N', 
+            scale=alt.Scale(
+                domain=['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'],
+                range=['#ff2828', '#ff8c00', '#ffd200', '#3cdc64']
+            ), 
+            title='Risk Level'
+        ),
         tooltip=[
-            'vessel_name:N',
-            'risk:N',
-            'flag:N',
-            'type:N',
-            'speed_kn:Q',
-            'imo:N',
-            'mmsi:N',
-            'region:N'
+            alt.Tooltip('vessel_name:N', title='Vessel'),
+            alt.Tooltip('risk:N', title='Risk'),
+            alt.Tooltip('flag:N', title='Flag'),
+            alt.Tooltip('type:N', title='Type'),
+            alt.Tooltip('speed_kn:Q', title='Speed (kn)'),
+            alt.Tooltip('imo:N', title='IMO'),
+            alt.Tooltip('mmsi:N', title='MMSI'),
+            alt.Tooltip('region:N', title='Region'),
         ]
     ).properties(
         width=1000,
         height=600,
-        title='Global Vessel Intelligence Map (Hover for details)'
-    ).project(
-        type='naturalEarth'
+        title='Global Vessel Intelligence Map — Hover for details'
     ).interactive()
     
     st.altair_chart(chart, use_container_width=True)
-    st.caption(f"📍 {len(map_data)} vessels tracked | 🔴 Critical | 🟠 High | 🟡 Medium | 🟢 Low | Hover over points for full details")
+    st.caption(f"📍 {len(map_data)} vessels tracked | 🔴 Critical | 🟠 High | 🟡 Medium | 🟢 Low | Hover for full details")
 else:
     st.info("No vessels match current filters")
 st.markdown("---")
