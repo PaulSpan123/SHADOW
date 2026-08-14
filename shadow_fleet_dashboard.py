@@ -441,24 +441,8 @@ if not filtered.empty:
         ))
     
     tooltip = {
-        "html": (
-            "<div style='background:#0B1929;border:1px solid #1A6EBD;border-radius:6px;"
-            "padding:12px;font-family:monospace;font-size:12px;color:#FFFFFF;min-width:280px;'>"
-            "<b style='color:#2E9BDA;font-size:13px;'>{vessel_name}</b><br/><br/>"
-            "<span style='color:#A8B8CC;'>IMO:</span> {imo}<br/>"
-            "<span style='color:#A8B8CC;'>MMSI:</span> {mmsi}<br/>"
-            "<span style='color:#A8B8CC;'>Flag:</span> <b>{flag}</b><br/>"
-            "<span style='color:#A8B8CC;'>Type:</span> {type}<br/>"
-            "<span style='color:#A8B8CC;'>Speed:</span> {speed_kn} kn<br/>"
-            "<span style='color:#A8B8CC;'>Heading:</span> {heading} degrees<br/>"
-            "<span style='color:#A8B8CC;'>Region:</span> {region}<br/>"
-            "<span style='color:#A8B8CC;'>Last Port:</span> {last_port}<br/><hr style='border-color:#1E3A5F;margin:8px 0;'>"
-            "<span style='color:#A8B8CC;'>AIS Dark:</span> <b>Yes</b><br/>"
-            "<span style='color:#A8B8CC;'>GPS Spoofed:</span> <b>Yes</b><br/>"
-            "<span style='color:#A8B8CC;'>STS Detected:</span> <b>Yes</b><br/>"
-            "</div>"
-        ),
-        "style": {"backgroundColor":"transparent","border":"none"}
+        "html": "<b>{vessel_name}</b><br/>IMO: {imo}<br/>MMSI: {mmsi}<br/>Flag: {flag}<br/>Risk: {risk}",
+        "style": {"backgroundColor": "#0B1929", "color": "#FFFFFF", "font-size": "12px"}
     }
     
     st.pydeck_chart(pdk.Deck(
