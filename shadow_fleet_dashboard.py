@@ -12,16 +12,9 @@ import pydeck as pdk
 import random
 import time
 import os
+import folium
+from streamlit_folium import st_folium
 from datetime import datetime, timedelta
-
-# ── MAPBOX TOKEN CONFIGURATION ────────────────────────────────────────────────
-# Set Mapbox token from Streamlit secrets or environment variable
-try:
-    mapbox_token = st.secrets.get("MAPBOX_TOKEN", os.getenv("MAPBOX_TOKEN", ""))
-    if mapbox_token:
-        os.environ["MAPBOX_API_KEY"] = mapbox_token
-except:
-    pass
 
 # ── PAGE CONFIG ───────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -260,15 +253,6 @@ with st.sidebar:
     spoofed_only  = st.checkbox("GPS-Spoofed Only",      False)
     sts_only      = st.checkbox("STS Events Only",       False)
 
-    st.markdown("### Map Style")
-    map_style = st.selectbox("Basemap", ["dark","satellite","road","light"])
-    MAP_STYLES = {
-        "dark":      "mapbox://styles/mapbox/dark-v10",
-        "satellite": "mapbox://styles/mapbox/satellite-streets-v11",
-        "road":      "mapbox://styles/mapbox/streets-v11",
-        "light":     "mapbox://styles/mapbox/light-v10",
-    }
-
     st.markdown("### Live Refresh")
     auto_refresh = st.checkbox("Auto-refresh every 30s", True)
     st.caption("Replace simulated data with live API endpoints.")
@@ -379,8 +363,6 @@ st.markdown("---")
 # ══════════════════════════════════════════════════════════════════════════════
 st.markdown('<div class="section-header">GLOBAL VESSEL INTELLIGENCE MAP</div>', unsafe_allow_html=True)
 
-layers = []
-
 if show_vessels and not filtered.empty:
     layers.append(pdk.Layer(
         "ScatterplotLayer", data=filtered,
@@ -404,74 +386,72 @@ if show_sts and not sts_df.empty:
     sts_f = sts_df[sts_df["vessel_id"].isin(filtered["vessel_id"])].copy()
     sts_f["target_lat"] = sts_f["lat"] + np.random.normal(0, 0.3, len(sts_f))
     sts_f["target_lon"] = sts_f["lon"] + np.random.normal(0, 0.3, len(sts_f))
-    sts_f["sc"] = [[255,140,0,200]]*len(sts_f)
-    sts_f["tc"] = [[255,60,60,200]]*len(sts_f)
-    layers.append(pdk.Layer(
-        "ArcLayer", data=sts_f,
-        get_source_position=["lon","lat"],
-        get_target_position=["target_lon","target_lat"],
-        get_source_color="sc", get_target_color="tc",
-        get_width=2, pickable=True, auto_highlight=True,
-    ))
-    layers.append(pdk.Layer(
-        "ScatterplotLayer", data=sts_f,
-        get_position=["lon","lat"], get_color=[255,140,0,220],
-        get_radius=60000, radius_min_pixels=6, radius_max_pixels=22,
-        pickable=True, stroked=True, line_width_min_pixels=2,
-        get_line_color=[255,200,0,255],
-    ))
 
-if show_heat and not filtered.empty:
-    layers.append(pdk.Layer(
-        "HeatmapLayer", data=filtered,
-        get_position=["lon","lat"],
-        get_weight=filtered["risk"].map({"CRITICAL":4,"HIGH":3,"MEDIUM":2,"LOW":1}).tolist(),
-        radiusPixels=60, intensity=1.2, threshold=0.05, opacity=0.6,
-    ))
+# ── BUILD FOLIUM MAP ──────────────────────────────────────────────────────────
+m = folium.Map(location=[27.0, 45.0], zoom_start=3, tiles="CartoDB dark_matter")
 
-if show_arcs and not filtered.empty:
-    arc_df = filtered.copy()
-    arc_df["port_lat"] = arc_df["last_port"].map(lambda p: PORT_COORDS.get(p,(0,0))[0])
-    arc_df["port_lon"] = arc_df["last_port"].map(lambda p: PORT_COORDS.get(p,(0,0))[1])
-    layers.append(pdk.Layer(
-        "ArcLayer", data=arc_df,
-        get_source_position=["port_lon","port_lat"],
-        get_target_position=["lon","lat"],
-        get_source_color=[100,200,255,100], get_target_color="color",
-        get_width=1, pickable=False, opacity=0.4,
-    ))
+# Add vessel markers
+if show_vessels and not filtered.empty:
+    for _, row in filtered.iterrows():
+        risk_color = {"CRITICAL": "red", "HIGH": "orange", "MEDIUM": "yellow", "LOW": "green"}
+        popup_text = f"""
+        <b>{row['vessel_name']}</b><br/>
+        IMO: {row['imo']}<br/>
+        Flag: {row['flag']}<br/>
+        Speed: {row['speed_kn']} kn<br/>
+        Risk: {row['risk']}<br/>
+        Region: {row['region']}
+        """
+        folium.CircleMarker(
+            location=[row['lat'], row['lon']],
+            radius=6,
+            popup=folium.Popup(popup_text, max_width=250),
+            color=risk_color.get(row['risk'], 'gray'),
+            fill=True,
+            fillColor=risk_color.get(row['risk'], 'gray'),
+            fillOpacity=0.7,
+            weight=2
+        ).add_to(m)
 
-tooltip = {
-    "html": (
-        "<div style='background:#0d1a2e;border:1px solid #2a9df4;border-radius:8px;"
-        "padding:12px 16px;font-family:monospace;font-size:13px;color:#e0f0ff;min-width:240px;'>"
-        "<b style='color:#7ecfff;font-size:15px;'>{vessel_name}</b><br/>"
-        "<span style='color:#aaa;'>IMO:</span> {imo} "
-        "<span style='color:#aaa;'>MMSI:</span> {mmsi}<br/>"
-        "<span style='color:#aaa;'>Flag:</span> <b>{flag}</b> "
-        "<span style='color:#aaa;'>Type:</span> {type}<br/>"
-        "<span style='color:#aaa;'>Speed:</span> {speed_kn} kn "
-        "<span style='color:#aaa;'>Hdg:</span> {heading} degrees<br/>"
-        "<span style='color:#aaa;'>Region:</span> {region}<br/>"
-        "<span style='color:#aaa;'>Last Port:</span> {last_port}<br/>"
-        "<hr style='border-color:#1e5080;margin:6px 0;'>"
-        "<span style='color:#aaa;'>AIS Dark:</span> <b>{ais_dark}</b> "
-        "<span style='color:#aaa;'>Spoofed:</span> <b>{spoofed}</b><br/>"
-        "<span style='color:#aaa;'>STS:</span> <b>{sts_detected}</b> "
-        "<span style='color:#aaa;'>Sanctions:</span> <b>{db_sanctions}</b>"
-        "</div>"
-    ),
-    "style": {"backgroundColor":"transparent","border":"none"}
-}
+# Add satellite detections
+if show_sat_pings and not sat_df.empty:
+    sat_f = sat_df[sat_df["vessel_id"].isin(filtered["vessel_id"])]
+    for _, row in sat_f.iterrows():
+        folium.CircleMarker(
+            location=[row['sat_lat'], row['sat_lon']],
+            radius=4,
+            popup=f"{row['vessel_name']}<br/>Sat: {row['image_source']}<br/>Conf: {row['sat_confidence']:.0%}",
+            color='purple',
+            fill=True,
+            fillColor='purple',
+            fillOpacity=0.5,
+            weight=1
+        ).add_to(m)
 
-st.pydeck_chart(pdk.Deck(
-    layers=layers,
-    initial_view_state=pdk.ViewState(latitude=27.0, longitude=45.0, zoom=2.8, pitch=35),
-    map_style=MAP_STYLES.get(map_style, MAP_STYLES["dark"]),
-    tooltip=tooltip,
-), use_container_width=True)
+# Add STS transfer events
+if show_sts and not sts_df.empty:
+    sts_f = sts_df[sts_df["vessel_id"].isin(filtered["vessel_id"])].copy()
+    for _, row in sts_f.iterrows():
+        target_lat = row['lat'] + np.random.normal(0, 0.3)
+        target_lon = row['lon'] + np.random.normal(0, 0.3)
+        folium.CircleMarker(
+            location=[row['lat'], row['lon']],
+            radius=7,
+            popup=f"{row['vessel_name']}<br/>STS Transfer<br/>Vol: {row['transfer_vol_kbd']} kbd",
+            color='orange',
+            fill=True,
+            fillColor='orange',
+            fillOpacity=0.8,
+            weight=2
+        ).add_to(m)
+        folium.PolyLine(
+            locations=[[row['lat'], row['lon']], [target_lat, target_lon]],
+            color='orange',
+            weight=2,
+            opacity=0.7
+        ).add_to(m)
 
-st.caption("Purple = Satellite Detection   Red = Critical   Orange = High or STS   Yellow = Medium   Green = Low")
+st_folium(m, width=1400, height=600)
 st.markdown("---")
 
 # ══════════════════════════════════════════════════════════════════════════════
