@@ -322,8 +322,8 @@ if "Insurance" in db_filter: filtered = filtered[filtered["db_insurance"]]
 filtered["color"] = filtered["risk"].map(RISK_COLOR)
 
 # Get top 5 high risk vessels for sidebar
-top_risk = filtered.nlargest(5, "risk").sort_values("risk", 
-    key=lambda x: x.map({"CRITICAL":0,"HIGH":1,"MEDIUM":2,"LOW":3}))
+top_risk = filtered.sort_values("risk", 
+    key=lambda x: x.map({"CRITICAL":0,"HIGH":1,"MEDIUM":2,"LOW":3})).head(5)
 
 # ── POPULATE SIDEBAR LIVE TRACKER ─────────────────────────────────────────────
 with st.sidebar:
