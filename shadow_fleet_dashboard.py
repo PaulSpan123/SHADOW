@@ -11,7 +11,17 @@ import numpy as np
 import pydeck as pdk
 import random
 import time
+import os
 from datetime import datetime, timedelta
+
+# ── MAPBOX TOKEN CONFIGURATION ────────────────────────────────────────────────
+# Set Mapbox token from Streamlit secrets or environment variable
+try:
+    mapbox_token = st.secrets.get("MAPBOX_TOKEN", os.getenv("MAPBOX_TOKEN", ""))
+    if mapbox_token:
+        os.environ["MAPBOX_API_KEY"] = mapbox_token
+except:
+    pass
 
 # ── PAGE CONFIG ───────────────────────────────────────────────────────────────
 st.set_page_config(
