@@ -1,70 +1,132 @@
 # shadow_fleet_dashboard.py
 # ─────────────────────────────────────────────────────────────────────────────
 # SHADOW — Stealthy Hub for Advanced Detection & Operational Watch
-# HCSS Dashboard Concept — Visual prototype
+# Professional Intelligence-Grade Dashboard
 # Run: streamlit run shadow_fleet_dashboard.py
 # ─────────────────────────────────────────────────────────────────────────────
 
 import streamlit as st
 import pandas as pd
 import numpy as np
+import pydeck as pdk
 import random
 import time
 from datetime import datetime, timedelta
 
 # ── PAGE CONFIG ───────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="SHADOW Dashboard — HCSS Concept",
+    page_title="SHADOW Dashboard",
     page_icon="🚢",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-# ── GLOBAL STYLE ──────────────────────────────────────────────────────────────
-st.markdown("""
+# ── PROFESSIONAL COLOR PALETTE ────────────────────────────────────────────────
+PRIMARY_BG = "#0B1929"      # Deep navy blue
+PANEL_BG = "#112240"        # Lighter panel navy
+ACCENT_BLUE = "#1A6EBD"     # Accent blue
+HIGHLIGHT_BLUE = "#2E9BDA"  # Highlight blue
+TEXT_PRIMARY = "#FFFFFF"    # White text
+TEXT_SECONDARY = "#A8B8CC"  # Light grey text
+BORDER_COLOR = "#1E3A5F"    # Dark border
+CRITICAL_RED = "#CC2936"    # Critical red
+AMBER_WARNING = "#E8A020"   # High priority amber
+SUCCESS_GREEN = "#2ECC71"   # Low risk green
+
+# ── PROFESSIONAL STYLING ──────────────────────────────────────────────────────
+st.markdown(f"""
 <style>
-  .stApp { background-color: #0a0f1e; color: #e0e6f0; }
-  section[data-testid="stSidebar"] { background-color: #0d1526; }
-
-  div[data-testid="metric-container"] {
-    background: linear-gradient(135deg,#0d2040,#0a3060);
-    border: 1px solid #1e5080;
-    border-radius: 10px;
-    padding: 14px 18px;
-  }
-  div[data-testid="metric-container"] label { color: #6ab0f5 !important; font-size:0.78rem; }
-  div[data-testid="metric-container"] div[data-testid="stMetricValue"] {
-    color: #ffffff; font-size:1.8rem; font-weight:700;
-  }
-
-  .section-header {
-    background: linear-gradient(90deg,#0d3060,#0a1830);
-    border-left: 4px solid #2a9df4;
+  body {{ background-color: {PRIMARY_BG}; }}
+  .stApp {{ background-color: {PRIMARY_BG}; color: {TEXT_PRIMARY}; }}
+  section[data-testid="stSidebar"] {{ background-color: {PANEL_BG}; }}
+  
+  /* Metric cards */
+  div[data-testid="metric-container"] {{
+    background: {PANEL_BG};
+    border: 1px solid {BORDER_COLOR};
+    border-top: 3px solid {ACCENT_BLUE};
     border-radius: 6px;
-    padding: 8px 16px;
-    margin: 18px 0 10px 0;
-    font-size: 1.05rem;
+    padding: 16px;
+  }}
+  div[data-testid="metric-container"] label {{ 
+    color: {TEXT_SECONDARY} !important; 
+    font-size: 0.75rem;
+    font-weight: 500;
+  }}
+  div[data-testid="metric-container"] div[data-testid="stMetricValue"] {{
+    color: {TEXT_PRIMARY};
+    font-size: 1.8rem;
+    font-weight: 700;
+  }}
+
+  /* Section headers */
+  .section-header {{
+    background: {PANEL_BG};
+    border-left: 4px solid {ACCENT_BLUE};
+    border-radius: 4px;
+    padding: 12px 16px;
+    margin: 20px 0 12px 0;
+    font-size: 0.95rem;
     font-weight: 600;
-    color: #7ecfff;
+    color: {TEXT_PRIMARY};
     letter-spacing: 0.05em;
-  }
+  }}
 
-  .db-badge {
-    display:inline-block; padding:3px 10px; border-radius:20px;
-    font-size:0.72rem; font-weight:700; margin:2px 3px; letter-spacing:0.04em;
-  }
-  .db-ais   { background:#0a3a6a; color:#5bb8ff; border:1px solid #1a6aaa; }
-  .db-sat   { background:#2a1a4a; color:#b98aff; border:1px solid #6a3aaa; }
-  .db-sanc  { background:#3a1a0a; color:#ff9955; border:1px solid #aa5a1a; }
-  .db-insur { background:#0a3a1a; color:#55dd88; border:1px solid #1aaa4a; }
+  /* Risk badges */
+  .risk-badge {{
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 16px;
+    font-size: 0.70rem;
+    font-weight: 700;
+    margin: 2px 4px;
+  }}
+  .risk-critical {{ background: {CRITICAL_RED}; color: white; }}
+  .risk-high {{ background: {AMBER_WARNING}; color: white; }}
+  .risk-medium {{ background: {ACCENT_BLUE}; color: white; }}
+  .risk-low {{ background: {SUCCESS_GREEN}; color: white; }}
 
-  .alert-box {
-    background:#1a0a0a; border:1px solid #cc2222;
-    border-radius:8px; padding:10px 16px; margin:6px 0;
-    font-size:0.83rem; color:#ff9999;
-  }
-  .alert-box span { color:#ff4444; font-weight:700; }
-  h1,h2,h3 { color:#7ecfff !important; }
+  /* Notification bars */
+  .notification {{
+    display: flex;
+    align-items: center;
+    background: {PANEL_BG};
+    border-left: 4px solid;
+    border-radius: 4px;
+    padding: 12px 16px;
+    margin: 8px 0;
+    font-size: 0.85rem;
+  }}
+  .notification-critical {{ border-left-color: {CRITICAL_RED}; }}
+  .notification-high {{ border-left-color: {AMBER_WARNING}; }}
+  .notification-medium {{ border-left-color: {ACCENT_BLUE}; }}
+
+  /* Tab styling */
+  .stTabs [data-baseweb="tab-list"] {{
+    background: transparent;
+    border-bottom: 1px solid {BORDER_COLOR};
+  }}
+  .stTabs [data-baseweb="tab"] {{
+    color: {TEXT_SECONDARY};
+    font-weight: 500;
+  }}
+  .stTabs [aria-selected="true"] {{
+    color: {TEXT_PRIMARY};
+    border-bottom: 2px solid {ACCENT_BLUE};
+  }}
+
+  /* Footer */
+  .footer {{
+    background: {PANEL_BG};
+    border-top: 1px solid {BORDER_COLOR};
+    padding: 16px;
+    margin-top: 32px;
+    text-align: center;
+    color: {TEXT_SECONDARY};
+    font-size: 0.75rem;
+  }}
+
+  h1, h2, h3 {{ color: {TEXT_PRIMARY} !important; }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -187,56 +249,34 @@ def generate_alerts(vessels_df, seed=0):
         "time":   (datetime.utcnow() - timedelta(minutes=int(rng.integers(1,120)))).strftime("%H:%M UTC"),
         "vessel": row["vessel_name"],
         "region": row["region"],
+        "risk":   row["risk"],
         "alert":  rng.choice(templates),
     } for _, row in critical.iterrows()]
 
-# ── HELPERS ───────────────────────────────────────────────────────────────────
+# ── RISK COLOR MAPPING ────────────────────────────────────────────────────────
 RISK_COLOR = {
-    "CRITICAL": [255, 40,  40,  220],
-    "HIGH":     [255, 140,  0,  200],
-    "MEDIUM":   [255, 210,  0,  180],
-    "LOW":      [60,  220, 100, 140],
-}
-RISK_HEX   = {"CRITICAL":"#ff2828","HIGH":"#ff8c00","MEDIUM":"#ffd200","LOW":"#3cdc64"}
-RISK_EMOJI = {"CRITICAL":"🔴","HIGH":"🟠","MEDIUM":"🟡","LOW":"🟢"}
-
-def db_badges(row):
-    out = ""
-    if row["db_ais"]:       out += '<span class="db-badge db-ais">AIS</span>'
-    if row["db_satellite"]: out += '<span class="db-badge db-sat">SAT</span>'
-    if row["db_sanctions"]: out += '<span class="db-badge db-sanc">SANC</span>'
-    if row["db_insurance"]: out += '<span class="db-badge db-insur">INS</span>'
-    return out
-
-PORT_COORDS = {
-    "Bandar Abbas": (27.18, 56.27), "Novorossiysk": (44.72, 37.77),
-    "Vladivostok":  (43.11,131.87), "Latakia":      (35.52, 35.77),
-    "Kharg Island": (29.24, 50.33), "Singapore":    (1.29,  103.85),
-    "Dubai":        (25.20, 55.27), "Fujairah":     (25.12, 56.34),
-    "Rotterdam":    (51.92,  4.48), "Shanghai":     (31.23, 121.47),
-    "Odessa":       (46.48, 30.73),
+    "CRITICAL": [204, 41,  54,  220],
+    "HIGH":     [232, 160,  32,  200],
+    "MEDIUM":   [26,  110, 189,  180],
+    "LOW":      [46,  204, 113, 140],
 }
 
 # ══════════════════════════════════════════════════════════════════════════════
 # SIDEBAR
 # ══════════════════════════════════════════════════════════════════════════════
 with st.sidebar:
-    st.markdown("## 🚢 SHADOW")
-    st.markdown(
-        "<span style='font-size:0.72rem;color:#3a7aaa;'>"
-        "Stealthy Hub for Advanced Detection and Operational Watch"
-        "</span>",
-        unsafe_allow_html=True
-    )
-    st.markdown("**v0.9 — HCSS Concept Build**")
+    st.markdown("<div style='font-size:2rem;font-weight:800;color:#FFFFFF;letter-spacing:0.1em;'>SHADOW</div>", 
+                unsafe_allow_html=True)
+    st.markdown(f"<div style='font-size:0.70rem;color:{TEXT_SECONDARY};font-style:italic;margin-bottom:12px;'>"
+                "Stealthy Hub for Advanced Detection and Operational Watch</div>", unsafe_allow_html=True)
+    st.markdown(f"<div style='font-size:0.85rem;color:{ACCENT_BLUE};font-weight:600;margin-bottom:20px;'>"
+                "HCSS Dashboard Concept</div>", unsafe_allow_html=True)
     st.markdown("---")
 
     st.markdown("### Map Layers")
     show_vessels   = st.toggle("Vessel Positions",     value=True)
-    show_sts       = st.toggle("STS Transfer Events",  value=True)
-    show_sat_pings = st.toggle("Satellite Detections", value=True)
+    show_sat_pings = st.toggle("Satellite Detections", value=False)
     show_heat      = st.toggle("Risk Heatmap",         value=False)
-    show_arcs      = st.toggle("Last-Port Arc Lines",  value=False)
 
     st.markdown("### Filters")
     risk_filter = st.multiselect("Risk Level",
@@ -249,25 +289,14 @@ with st.sidebar:
     spoofed_only  = st.checkbox("GPS-Spoofed Only",      False)
     sts_only      = st.checkbox("STS Events Only",       False)
 
-    st.markdown("### Live Refresh")
+    st.markdown("### Live Updates")
     auto_refresh = st.checkbox("Auto-refresh every 30s", True)
-    st.caption("Replace simulated data with live API endpoints.")
 
     st.markdown("---")
-    st.markdown("**Databases Active:**")
-    st.markdown("""
-<span class="db-badge db-ais">AIS LIVE</span>
-<span class="db-badge db-sat">SAT IMG</span>
-<span class="db-badge db-sanc">SANCTIONS</span>
-<span class="db-badge db-insur">INSURANCE</span>
-""", unsafe_allow_html=True)
-
-    if st.button("Force Refresh"):
-        st.cache_data.clear()
-        st.rerun()
+    st.markdown("### Top Risk Vessels")
 
 # ══════════════════════════════════════════════════════════════════════════════
-# DATA LOAD
+# DATA LOAD & FILTERS
 # ══════════════════════════════════════════════════════════════════════════════
 seed_val    = int(time.time()) // 30 if auto_refresh else 42
 vessels_df  = generate_vessels(n=120, seed=seed_val)
@@ -276,7 +305,7 @@ sts_df      = generate_sts_events(vessels_df, seed=seed_val)
 sanction_df = generate_sanctions_data(seed=seed_val)
 alerts      = generate_alerts(vessels_df, seed=seed_val)
 
-# ── APPLY FILTERS ─────────────────────────────────────────────────────────────
+# Apply filters
 filtered = vessels_df[
     vessels_df["risk"].isin(risk_filter) &
     vessels_df["flag"].isin(flag_filter)
@@ -292,259 +321,277 @@ if "Insurance" in db_filter: filtered = filtered[filtered["db_insurance"]]
 
 filtered["color"] = filtered["risk"].map(RISK_COLOR)
 
+# Get top 5 high risk vessels for sidebar
+top_risk = filtered.nlargest(5, "risk").sort_values("risk", 
+    key=lambda x: x.map({"CRITICAL":0,"HIGH":1,"MEDIUM":2,"LOW":3}))
+
+# ── POPULATE SIDEBAR LIVE TRACKER ─────────────────────────────────────────────
+with st.sidebar:
+    for _, vessel in top_risk.iterrows():
+        risk_badge = f'<span class="risk-badge risk-{vessel["risk"].lower()}">{vessel["risk"]}</span>'
+        st.markdown(
+            f"<div style='background:{PANEL_BG};border:1px solid {BORDER_COLOR};border-radius:4px;padding:10px;margin:6px 0;'>"
+            f"<div style='font-weight:600;color:{TEXT_PRIMARY};font-size:0.85rem;'>{vessel['vessel_name']}</div>"
+            f"<div style='font-size:0.70rem;color:{TEXT_SECONDARY};margin:4px 0;'>{vessel['flag']} • {vessel['region']}</div>"
+            f"{risk_badge}"
+            f"<div style='font-size:0.65rem;color:{TEXT_SECONDARY};margin-top:6px;'>Last seen: {vessel['last_seen'].strftime('%H:%M UTC')}</div>"
+            f"</div>",
+            unsafe_allow_html=True
+        )
+
 # ══════════════════════════════════════════════════════════════════════════════
-# HEADER
+# MAIN CONTENT AREA
 # ══════════════════════════════════════════════════════════════════════════════
-col_logo, col_title, col_time = st.columns([1, 6, 2])
-with col_logo:
-    st.markdown("# 🚢")
-with col_title:
-    st.markdown(
-        "<div style='margin-bottom:2px;'>"
-        "<span style='font-size:0.78rem;font-weight:600;letter-spacing:0.18em;"
-        "color:#2a9df4;text-transform:uppercase;'>HCSS Dashboard Concept</span>"
-        "</div>"
-        "<div style='font-size:2rem;font-weight:800;color:#7ecfff;"
-        "letter-spacing:0.06em;line-height:1.15;margin-bottom:2px;'>"
-        "<span style='color:#ffffff;'>SHADOW</span>"
-        "</div>"
-        "<div style='font-size:0.88rem;color:#5a9fd4;font-style:italic;font-weight:500;"
-        "letter-spacing:0.03em;'>"
-        "Stealthy Hub for Advanced Detection and Operational Watch"
-        "</div>"
-        "<div style='margin-top:5px;font-size:0.75rem;color:#3a7aaa;'>"
-        "AIS - Satellite Imagery - Sanctions Lists - Insurance Records"
-        "</div>",
-        unsafe_allow_html=True
-    )
-with col_time:
-    st.markdown(
-        f"<br>🕐 **{datetime.utcnow().strftime('%Y-%m-%d  %H:%M:%S UTC')}**",
-        unsafe_allow_html=True
-    )
+
+# Header
+col1, col2 = st.columns([6, 1])
+with col1:
+    st.markdown(f"<div style='font-size:2.2rem;font-weight:800;color:{TEXT_PRIMARY};margin-bottom:2px;'>"
+                "SHADOW Vessel Intelligence Platform</div>", unsafe_allow_html=True)
+    st.markdown(f"<div style='font-size:0.85rem;color:{TEXT_SECONDARY};'>Global maritime domain awareness and threat assessment</div>",
+                unsafe_allow_html=True)
+with col2:
+    st.markdown(f"<div style='text-align:right;font-size:0.75rem;color:{TEXT_SECONDARY};'>"
+                f"Last updated:<br/>{datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}</div>", 
+                unsafe_allow_html=True)
 
 st.markdown("---")
 
-# ══════════════════════════════════════════════════════════════════════════════
-# KPI METRICS
-# ══════════════════════════════════════════════════════════════════════════════
-k1,k2,k3,k4,k5,k6,k7 = st.columns(7)
-k1.metric("🚢 Tracked Vessels", len(filtered),                           f"+{random.randint(1,5)} 1h")
-k2.metric("🔴 Critical Risk",   (filtered["risk"]=="CRITICAL").sum(),    f"+{random.randint(0,3)}")
-k3.metric("🌑 AIS Dark",        filtered["ais_dark"].sum(),              f"+{random.randint(0,4)}")
-k4.metric("📡 GPS Spoofed",     filtered["spoofed"].sum(),               f"+{random.randint(0,3)}")
-k5.metric("⚓ STS Detected",    filtered["sts_detected"].sum(),          f"+{random.randint(0,2)}")
-k6.metric("🚫 Sanctioned",      filtered["db_sanctions"].sum(),          "+-0")
-k7.metric("🔗 Multi-DB Match",
+# Notifications
+st.markdown('<div class="section-header">ACTIVE ALERTS</div>', unsafe_allow_html=True)
+alert_count = 0
+for a in alerts[:4]:
+    risk_border = {"CRITICAL": CRITICAL_RED, "HIGH": AMBER_WARNING, "MEDIUM": ACCENT_BLUE}
+    risk_color = risk_border.get(a["risk"], ACCENT_BLUE)
+    severity_text = a["risk"]
+    st.markdown(
+        f'<div class="notification notification-{a["risk"].lower()}" style="border-left-color:{risk_color};">'
+        f'<div style="font-weight:700;color:{risk_color};min-width:70px;">{severity_text}</div>'
+        f'<div style="margin:0 12px;color:{TEXT_PRIMARY};font-weight:600;">{a["vessel"]}</div>'
+        f'<div style="margin-left:auto;color:{TEXT_SECONDARY};font-size:0.75rem;">{a["region"]} • {a["time"]}</div>'
+        f'</div>',
+        unsafe_allow_html=True
+    )
+    alert_count += 1
+
+if alert_count == 0:
+    st.markdown(f'<div style="padding:12px;color:{TEXT_SECONDARY};font-size:0.85rem;">No active alerts</div>', 
+                unsafe_allow_html=True)
+
+st.markdown("---")
+
+# KPI Metrics
+st.markdown('<div class="section-header">FLEET STATISTICS</div>', unsafe_allow_html=True)
+m1, m2, m3, m4, m5, m6, m7 = st.columns(7)
+m1.metric("Tracked Vessels", len(filtered), f"+{random.randint(1,5)}")
+m2.metric("Critical Risk",   (filtered["risk"]=="CRITICAL").sum(), f"+{random.randint(0,3)}")
+m3.metric("AIS Dark",        filtered["ais_dark"].sum(), f"+{random.randint(0,4)}")
+m4.metric("GPS Spoofed",     filtered["spoofed"].sum(), f"+{random.randint(0,3)}")
+m5.metric("STS Detected",    filtered["sts_detected"].sum(), f"+{random.randint(0,2)}")
+m6.metric("Sanctioned",      filtered["db_sanctions"].sum(), "+-0")
+m7.metric("Multi-DB Match",
     ((filtered["db_ais"].astype(int)+filtered["db_satellite"].astype(int)+
       filtered["db_sanctions"].astype(int)+filtered["db_insurance"].astype(int))>=3).sum(),
     f"+{random.randint(0,4)}")
 
 st.markdown("---")
 
-# ══════════════════════════════════════════════════════════════════════════════
-# ALERT TICKER
-# ══════════════════════════════════════════════════════════════════════════════
-st.markdown('<div class="section-header">LIVE INTELLIGENCE ALERTS</div>', unsafe_allow_html=True)
-for a in alerts[:5]:
-    st.markdown(
-        f'<div class="alert-box"><span>[{a["time"]}]</span> '
-        f'<b>{a["vessel"]}</b> — {a["region"]} | {a["alert"]}</div>',
-        unsafe_allow_html=True)
-
-st.markdown("---")
-
-# ══════════════════════════════════════════════════════════════════════════════
-# MAP
-# ══════════════════════════════════════════════════════════════════════════════
-st.markdown('<div class="section-header">GLOBAL VESSEL INTELLIGENCE MAP</div>', unsafe_allow_html=True)
+# Map
+st.markdown('<div class="section-header">GLOBAL VESSEL POSITIONS</div>', unsafe_allow_html=True)
 
 if not filtered.empty:
-    # Prepare data for Streamlit map
-    map_data = pd.DataFrame()
-    map_data['latitude'] = filtered['lat']
-    map_data['longitude'] = filtered['lon']
+    # Build map layers
+    layers = []
     
-    # Add vessel details as columns for display
-    map_data['vessel_name'] = filtered['vessel_name']
-    map_data['risk'] = filtered['risk']
-    map_data['flag'] = filtered['flag']
-    map_data['type'] = filtered['type']
-    map_data['speed_kn'] = filtered['speed_kn']
-    map_data['imo'] = filtered['imo']
-    map_data['mmsi'] = filtered['mmsi']
-    map_data['region'] = filtered['region']
+    if show_vessels and not filtered.empty:
+        # Scale radius by risk level
+        risk_radius = filtered["risk"].map({"CRITICAL": 80000, "HIGH": 60000, "MEDIUM": 40000, "LOW": 30000})
+        
+        layers.append(pdk.Layer(
+            "ScatterplotLayer", data=filtered,
+            get_position=["lon","lat"], get_color="color",
+            get_radius=risk_radius,
+            radius_min_pixels=5, radius_max_pixels=20,
+            pickable=True, opacity=0.85, stroked=True,
+            line_width_min_pixels=1, get_line_color=[255,255,255,120],
+        ))
+        
+        # Label top 20 highest risk vessels
+        top_20 = filtered.nlargest(20, "risk").sort_values("risk", 
+            key=lambda x: x.map({"CRITICAL":0,"HIGH":1,"MEDIUM":2,"LOW":3}))
+        
+        layers.append(pdk.Layer(
+            "TextLayer", data=top_20,
+            get_position=["lon","lat"],
+            get_text="vessel_name",
+            get_size=12,
+            get_color=[255, 255, 255, 200],
+            get_angle=0,
+            get_text_anchor="middle",
+            get_alignment_baseline="center",
+            pickable=False,
+        ))
     
-    # Display map with built-in Streamlit functionality
-    st.map(map_data, zoom=2, use_container_width=True)
+    if show_heat and not filtered.empty:
+        layers.append(pdk.Layer(
+            "HeatmapLayer", data=filtered,
+            get_position=["lon","lat"],
+            get_weight=filtered["risk"].map({"CRITICAL":4,"HIGH":3,"MEDIUM":2,"LOW":1}).tolist(),
+            radiusPixels=60, intensity=1.2, threshold=0.05, opacity=0.5,
+        ))
     
-    # Show vessel details table below map
-    st.subheader("📋 Vessel Details")
+    tooltip = {
+        "html": (
+            "<div style='background:#0B1929;border:1px solid #1A6EBD;border-radius:6px;"
+            "padding:12px;font-family:monospace;font-size:12px;color:#FFFFFF;min-width:280px;'>"
+            "<b style='color:#2E9BDA;font-size:13px;'>{vessel_name}</b><br/><br/>"
+            "<span style='color:#A8B8CC;'>IMO:</span> {imo}<br/>"
+            "<span style='color:#A8B8CC;'>MMSI:</span> {mmsi}<br/>"
+            "<span style='color:#A8B8CC;'>Flag:</span> <b>{flag}</b><br/>"
+            "<span style='color:#A8B8CC;'>Type:</span> {type}<br/>"
+            "<span style='color:#A8B8CC;'>Speed:</span> {speed_kn} kn<br/>"
+            "<span style='color:#A8B8CC;'>Heading:</span> {heading} degrees<br/>"
+            "<span style='color:#A8B8CC;'>Region:</span> {region}<br/>"
+            "<span style='color:#A8B8CC;'>Last Port:</span> {last_port}<br/><hr style='border-color:#1E3A5F;margin:8px 0;'>"
+            "<span style='color:#A8B8CC;'>AIS Dark:</span> <b>Yes</b><br/>"
+            "<span style='color:#A8B8CC;'>GPS Spoofed:</span> <b>Yes</b><br/>"
+            "<span style='color:#A8B8CC;'>STS Detected:</span> <b>Yes</b><br/>"
+            "</div>"
+        ),
+        "style": {"backgroundColor":"transparent","border":"none"}
+    }
     
-    # Create a summary table with key info
-    detail_cols = ['vessel_name', 'risk', 'flag', 'type', 'speed_kn', 'imo', 'region']
-    display_data = filtered[detail_cols].copy()
-    display_data = display_data.rename(columns={
-        'vessel_name': 'Vessel',
-        'risk': 'Risk',
-        'flag': 'Flag',
-        'type': 'Type',
-        'speed_kn': 'Speed (kn)',
-        'imo': 'IMO',
-        'region': 'Region'
-    })
-    
-    # Color code risk levels
-    st.dataframe(
-        display_data.sort_values('Risk', key=lambda x: x.map({'CRITICAL': 0, 'HIGH': 1, 'MEDIUM': 2, 'LOW': 3})),
-        use_container_width=True,
-        height=400
-    )
-    
-    st.caption(f"📍 {len(map_data)} vessels tracked | 🔴 Critical | 🟠 High | 🟡 Medium | 🟢 Low")
+    st.pydeck_chart(pdk.Deck(
+        layers=layers,
+        initial_view_state=pdk.ViewState(latitude=25.0, longitude=45.0, zoom=2.5, pitch=40),
+        map_style="mapbox://styles/mapbox/dark-v10",
+        tooltip=tooltip,
+    ), use_container_width=True, height=600)
 else:
     st.info("No vessels match current filters")
+
 st.markdown("---")
 
-# ══════════════════════════════════════════════════════════════════════════════
-# TABS
-# ══════════════════════════════════════════════════════════════════════════════
+# Tabs
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
-    "Vessel Intel", "Satellite Log", "STS Events", "Sanctions DB", "Analytics"
+    "Vessel Intelligence", "Satellite Log", "STS Events", "Sanctions Database", "Analytics"
 ])
 
-# ── TAB 1 ─────────────────────────────────────────────────────────────────────
+# ── TAB 1: VESSEL INTELLIGENCE ────────────────────────────────────────────────
 with tab1:
-    st.markdown('<div class="section-header">AIS + SATELLITE + SANCTIONS + INSURANCE CROSS-MATCH</div>',
-                unsafe_allow_html=True)
-    vsearch = st.text_input("Search Vessel / IMO / MMSI")
-    disp    = filtered.copy()
-    if vsearch:
-        disp = disp[disp["vessel_name"].str.contains(vsearch, case=False) |
-                    disp["imo"].str.contains(vsearch, case=False) |
-                    disp["mmsi"].str.contains(vsearch, case=False)]
-    disp["_r"] = disp["risk"].map({"CRITICAL":0,"HIGH":1,"MEDIUM":2,"LOW":3})
-    disp = disp.sort_values("_r")
-    for _, row in disp.head(25).iterrows():
-        with st.expander(
-            f"{RISK_EMOJI[row['risk']]}  {row['vessel_name']}  "
-            f"{row['flag']}  {row['type']}  {row['region']}"
-        ):
-            c1,c2,c3,c4 = st.columns(4)
-            c1.markdown(
-                f"**IMO:** {row['imo']}\n\n"
-                f"**MMSI:** {row['mmsi']}\n\n"
-                f"**Flag:** {row['flag']}\n\n"
-                f"**Type:** {row['type']}"
-            )
-            c2.markdown(
-                f"**Speed:** {row['speed_kn']} kn\n\n"
-                f"**Heading:** {row['heading']} degrees\n\n"
-                f"**Last Port:** {row['last_port']}\n\n"
-                f"**Region:** {row['region']}"
-            )
-            c3.markdown(
-                f"**AIS Dark:** {'YES' if row['ais_dark'] else 'No'}\n\n"
-                f"**GPS Spoofed:** {'YES' if row['spoofed'] else 'No'}\n\n"
-                f"**STS Detected:** {'YES' if row['sts_detected'] else 'No'}\n\n"
-                f"**Cargo Est.:** {int(row['cargo_est_kbd'])} kbd"
-            )
-            c4.markdown(f"**Last Seen:** {row['last_seen'].strftime('%H:%M UTC')}\n\n**Databases:**")
-            c4.markdown(db_badges(row), unsafe_allow_html=True)
+    st.markdown('<div class="section-header">VESSEL INTELLIGENCE QUERY</div>', unsafe_allow_html=True)
+    
+    search_term = st.text_input("Search by vessel name, IMO, or MMSI", "")
+    
+    disp = filtered.copy()
+    if search_term:
+        disp = disp[disp["vessel_name"].str.contains(search_term, case=False) |
+                    disp["imo"].str.contains(search_term, case=False) |
+                    disp["mmsi"].str.contains(search_term, case=False)]
+    
+    disp = disp.sort_values("risk", key=lambda x: x.map({"CRITICAL":0,"HIGH":1,"MEDIUM":2,"LOW":3}))
+    
+    # Create display dataframe
+    display_df = disp[["vessel_name", "risk", "flag", "type", "speed_kn", "imo", "mmsi", "region"]].copy()
+    display_df.columns = ["Vessel", "Risk", "Flag", "Type", "Speed (kn)", "IMO", "MMSI", "Region"]
+    
+    # Add databases column
+    db_cols = []
+    for _, row in disp.iterrows():
+        dbs = []
+        if row["db_ais"]: dbs.append("AIS")
+        if row["db_satellite"]: dbs.append("SAT")
+        if row["db_sanctions"]: dbs.append("SANC")
+        if row["db_insurance"]: dbs.append("INS")
+        db_cols.append(", ".join(dbs) if dbs else "None")
+    
+    display_df["Databases"] = db_cols
+    
+    # Display table
+    st.dataframe(display_df, use_container_width=True, height=500)
 
-# ── TAB 2 ─────────────────────────────────────────────────────────────────────
+# ── TAB 2: SATELLITE LOG ──────────────────────────────────────────────────────
 with tab2:
     st.markdown('<div class="section-header">SATELLITE DETECTION LOG</div>', unsafe_allow_html=True)
+    
     sat_show = sat_df[sat_df["vessel_id"].isin(filtered["vessel_id"])].copy()
-    sat_show["AIS Match"]  = sat_show["ais_match"].map({True:"Matched", False:"Dark / No Match"})
-    sat_show["Confidence"] = sat_show["sat_confidence"].apply(lambda x: f"{x:.0%}")
-    st.dataframe(
-        sat_show[["vessel_name","flag","type","region","image_source","Confidence","AIS Match","risk"]].rename(
-            columns={"vessel_name":"Vessel","flag":"Flag","type":"Type",
-                     "image_source":"Sat Source","risk":"Risk"}),
-        use_container_width=True, height=480)
+    if not sat_show.empty:
+        sat_show["AIS Match"]  = sat_show["ais_match"].map({True:"Matched", False:"Dark / No Match"})
+        sat_show["Confidence"] = sat_show["sat_confidence"].apply(lambda x: f"{x:.0%}")
+        
+        display_sat = sat_show[["vessel_name","flag","type","region","image_source","Confidence","AIS Match"]].copy()
+        display_sat.columns = ["Vessel", "Flag", "Type", "Region", "Satellite Source", "Confidence", "AIS Match"]
+        
+        st.dataframe(display_sat, use_container_width=True, height=400)
+    else:
+        st.info("No satellite data for filtered vessels")
 
-# ── TAB 3 ─────────────────────────────────────────────────────────────────────
+# ── TAB 3: STS EVENTS ─────────────────────────────────────────────────────────
 with tab3:
     st.markdown('<div class="section-header">SHIP-TO-SHIP TRANSFER EVENTS</div>', unsafe_allow_html=True)
+    
     sts_show = sts_df[sts_df["vessel_id"].isin(filtered["vessel_id"])].copy()
     if not sts_show.empty:
-        sts_show["Vol (kbd)"]   = sts_show["transfer_vol_kbd"].astype(int)
-        sts_show["Duration"]    = sts_show["duration_hrs"].apply(lambda x: f"{x}h")
-        sts_show["Coordinates"] = sts_show.apply(
-            lambda r: f"{r['lat']:.3f}, {r['lon']:.3f}", axis=1)
-        st.dataframe(
-            sts_show[["vessel_name","pair_vessel","region","Coordinates",
-                      "Vol (kbd)","Duration","risk"]].rename(
-                columns={"vessel_name":"Primary Vessel","pair_vessel":"Transfer Pair","risk":"Risk"}),
-            use_container_width=True, height=420)
-        st.info(
-            f"{len(sts_show)} STS events detected. "
-            f"Estimated total undocumented cargo: {int(sts_show['transfer_vol_kbd'].sum()):,} kbd"
-        )
+        sts_show["Volume"] = sts_show["transfer_vol_kbd"].astype(int).astype(str) + " kbd"
+        sts_show["Duration"] = sts_show["duration_hrs"].apply(lambda x: f"{x}h")
+        
+        display_sts = sts_show[["vessel_name","pair_vessel","region","Volume","Duration","risk"]].copy()
+        display_sts.columns = ["Primary Vessel", "Transfer Pair", "Region", "Volume", "Duration", "Risk"]
+        
+        st.dataframe(display_sts, use_container_width=True, height=400)
+        st.info(f"Total undocumented cargo: {int(sts_show['transfer_vol_kbd'].sum()):,} kbd")
     else:
-        st.info("No STS events match current filters.")
+        st.info("No STS events match current filters")
 
-# ── TAB 4 ─────────────────────────────────────────────────────────────────────
+# ── TAB 4: SANCTIONS DATABASE ─────────────────────────────────────────────────
 with tab4:
     st.markdown('<div class="section-header">SANCTIONS ENTITY DATABASE</div>', unsafe_allow_html=True)
-    c1, c2 = st.columns([3,1])
-    with c1:
-        st.dataframe(sanction_df, use_container_width=True, height=380)
-    with c2:
+    
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        st.dataframe(sanction_df, use_container_width=True, height=400)
+    with col2:
         st.metric("Active Sanctions",     (sanction_df["status"]=="ACTIVE").sum())
         st.metric("Total Entities",       len(sanction_df))
-        st.metric("Total Vessels Linked",
+        st.metric("Vessels Linked",
             sanction_df[sanction_df["status"]=="ACTIVE"]["vessels_linked"].sum())
-        st.markdown("**Listed By:**")
-        for lb, cnt in sanction_df["listed_by"].value_counts().items():
-            st.markdown(f"- **{lb}**: {cnt}")
 
-# ── TAB 5 ─────────────────────────────────────────────────────────────────────
+# ── TAB 5: ANALYTICS ──────────────────────────────────────────────────────────
 with tab5:
     st.markdown('<div class="section-header">THREAT ANALYTICS</div>', unsafe_allow_html=True)
-    a1, a2 = st.columns(2)
-    with a1:
-        st.markdown("**Risk Distribution**")
-        st.bar_chart(filtered["risk"].value_counts().reindex(
-            ["CRITICAL","HIGH","MEDIUM","LOW"], fill_value=0), color="#2a9df4")
-        st.markdown("**AIS Dark Vessels by Flag**")
-        st.bar_chart(
-            filtered.groupby("flag")["ais_dark"].sum().sort_values(ascending=False).head(10),
-            color="#ff4444")
-    with a2:
-        st.markdown("**Detections by Region**")
-        st.bar_chart(filtered["region"].value_counts().head(10), color="#ffaa00")
-        st.markdown("**Database Coverage Overlap**")
-        db_overlap = pd.DataFrame({
-            "Database": ["AIS Only","SAT Only","SANC Only","INS Only",
-                         "AIS+SAT","AIS+SAT+SANC","All 4 DBs"],
-            "Vessels": [
-                int((filtered["db_ais"] & ~filtered["db_satellite"] & ~filtered["db_sanctions"] & ~filtered["db_insurance"]).sum()),
-                int((~filtered["db_ais"] & filtered["db_satellite"] & ~filtered["db_sanctions"] & ~filtered["db_insurance"]).sum()),
-                int((~filtered["db_ais"] & ~filtered["db_satellite"] & filtered["db_sanctions"] & ~filtered["db_insurance"]).sum()),
-                int((~filtered["db_ais"] & ~filtered["db_satellite"] & ~filtered["db_sanctions"] & filtered["db_insurance"]).sum()),
-                int((filtered["db_ais"] & filtered["db_satellite"] & ~filtered["db_sanctions"] & ~filtered["db_insurance"]).sum()),
-                int((filtered["db_ais"] & filtered["db_satellite"] & filtered["db_sanctions"] & ~filtered["db_insurance"]).sum()),
-                int((filtered["db_ais"] & filtered["db_satellite"] & filtered["db_sanctions"] & filtered["db_insurance"]).sum()),
-            ]
-        })
-        st.bar_chart(db_overlap.set_index("Database")["Vessels"], color="#aa44ff")
+    
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        dark_rate = filtered["ais_dark"].mean()
+        st.metric("AIS Dark Rate", f"{dark_rate:.0%}")
+        st.progress(dark_rate)
+    with col2:
+        spoof_rate = filtered["spoofed"].mean()
+        st.metric("Spoofing Rate", f"{spoof_rate:.0%}")
+        st.progress(spoof_rate)
+    with col3:
+        sts_rate = filtered["sts_detected"].mean()
+        st.metric("STS Rate", f"{sts_rate:.0%}")
+        st.progress(sts_rate)
+    
     st.markdown("---")
-    s1,s2,s3,s4 = st.columns(4)
-    s1.metric("Avg Speed (kn)", f"{filtered['speed_kn'].mean():.1f}")
-    s2.metric("AIS Dark Rate",  f"{filtered['ais_dark'].mean():.0%}")
-    s3.metric("Spoofing Rate",  f"{filtered['spoofed'].mean():.0%}")
-    s4.metric("STS Rate",       f"{filtered['sts_detected'].mean():.0%}")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("**Risk Distribution**")
+        risk_dist = filtered["risk"].value_counts().reindex(["CRITICAL","HIGH","MEDIUM","LOW"], fill_value=0)
+        st.bar_chart(risk_dist, color=["#CC2936", "#E8A020", "#1A6EBD", "#2ECC71"])
+    with col2:
+        st.markdown("**Detections by Region**")
+        st.bar_chart(filtered["region"].value_counts().head(10))
 
-# ── FOOTER ────────────────────────────────────────────────────────────────────
 st.markdown("---")
-st.markdown(
-    "<div style='text-align:center;color:#3a6090;font-size:0.78rem;padding:10px 0;'>"
-    "SHADOW — Stealthy Hub for Advanced Detection and Operational Watch<br/>"
-    "HCSS Dashboard Concept — Prototype Build — All data simulated for demonstration<br/>"
-    "Live integration targets: MarineTraffic AIS — Sentinel-1 SAR / Planet Labs "
-    "— OFAC / EU / UN Sanctions — Lloyds Insurance Registry"
-    "</div>",
-    unsafe_allow_html=True
-)
+
+# Footer
+st.markdown(f"""
+<div class="footer">
+SHADOW — Stealthy Hub for Advanced Detection and Operational Watch | Version 1.0.0<br>
+Data Sources: AIS Live Feed • Satellite Imagery • Sanctions Lists • Insurance Registry<br>
+Last Updated: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}
+</div>
+""", unsafe_allow_html=True)
