@@ -10,8 +10,6 @@ import pandas as pd
 import numpy as np
 import random
 import time
-import folium
-from streamlit_folium import st_folium
 from datetime import datetime, timedelta
 
 # ── PAGE CONFIG ───────────────────────────────────────────────────────────────
@@ -361,72 +359,25 @@ st.markdown("---")
 # ══════════════════════════════════════════════════════════════════════════════
 st.markdown('<div class="section-header">GLOBAL VESSEL INTELLIGENCE MAP</div>', unsafe_allow_html=True)
 
-# ── BUILD FOLIUM MAP ──────────────────────────────────────────────────────────
-m = folium.Map(location=[27.0, 45.0], zoom_start=3, tiles="CartoDB dark_matter")
+# Prepare data for map
+map_data = filtered[["lat", "lon", "vessel_name", "risk", "flag", "speed_kn"]].copy()
+map_data.columns = ["latitude", "longitude", "vessel", "risk", "flag", "speed"]
 
-# Add vessel markers
-if show_vessels and not filtered.empty:
-    for _, row in filtered.iterrows():
-        risk_color = {"CRITICAL": "red", "HIGH": "orange", "MEDIUM": "yellow", "LOW": "green"}
-        popup_text = f"""
-        <b>{row['vessel_name']}</b><br/>
-        IMO: {row['imo']}<br/>
-        Flag: {row['flag']}<br/>
-        Speed: {row['speed_kn']} kn<br/>
-        Risk: {row['risk']}<br/>
-        Region: {row['region']}
-        """
-        folium.CircleMarker(
-            location=[row['lat'], row['lon']],
-            radius=6,
-            popup=folium.Popup(popup_text, max_width=250),
-            color=risk_color.get(row['risk'], 'gray'),
-            fill=True,
-            fillColor=risk_color.get(row['risk'], 'gray'),
-            fillOpacity=0.7,
-            weight=2
-        ).add_to(m)
+# Color code by risk
+risk_colors = {
+    "CRITICAL": "#ff2828",
+    "HIGH": "#ff8c00", 
+    "MEDIUM": "#ffd200",
+    "LOW": "#3cdc64"
+}
+map_data["color"] = map_data["risk"].map(risk_colors)
 
-# Add satellite detections
-if show_sat_pings and not sat_df.empty:
-    sat_f = sat_df[sat_df["vessel_id"].isin(filtered["vessel_id"])]
-    for _, row in sat_f.iterrows():
-        folium.CircleMarker(
-            location=[row['sat_lat'], row['sat_lon']],
-            radius=4,
-            popup=f"{row['vessel_name']}<br/>Sat: {row['image_source']}<br/>Conf: {row['sat_confidence']:.0%}",
-            color='purple',
-            fill=True,
-            fillColor='purple',
-            fillOpacity=0.5,
-            weight=1
-        ).add_to(m)
-
-# Add STS transfer events
-if show_sts and not sts_df.empty:
-    sts_f = sts_df[sts_df["vessel_id"].isin(filtered["vessel_id"])].copy()
-    for _, row in sts_f.iterrows():
-        target_lat = row['lat'] + np.random.normal(0, 0.3)
-        target_lon = row['lon'] + np.random.normal(0, 0.3)
-        folium.CircleMarker(
-            location=[row['lat'], row['lon']],
-            radius=7,
-            popup=f"{row['vessel_name']}<br/>STS Transfer<br/>Vol: {row['transfer_vol_kbd']} kbd",
-            color='orange',
-            fill=True,
-            fillColor='orange',
-            fillOpacity=0.8,
-            weight=2
-        ).add_to(m)
-        folium.PolyLine(
-            locations=[[row['lat'], row['lon']], [target_lat, target_lon]],
-            color='orange',
-            weight=2,
-            opacity=0.7
-        ).add_to(m)
-
-st_folium(m, width=1400, height=600)
-st.caption("Red = Critical Risk | Orange = High/STS | Yellow = Medium | Green = Low | Purple = Satellite")
+# Display map
+if not map_data.empty:
+    st.map(map_data, latitude="latitude", longitude="longitude", size=5)
+    st.caption(f"🔴 Showing {len(map_data)} vessels | Red=Critical, Orange=High, Yellow=Medium, Green=Low")
+else:
+    st.info("No vessels match current filters")
 st.markdown("---")
 
 # ══════════════════════════════════════════════════════════════════════════════
