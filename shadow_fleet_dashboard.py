@@ -10,7 +10,7 @@ import pandas as pd
 import numpy as np
 import random
 import time
-import plotly.graph_objects as go
+import altair as alt
 from datetime import datetime, timedelta
 
 # ── PAGE CONFIG ───────────────────────────────────────────────────────────────
@@ -293,17 +293,6 @@ if "Insurance" in db_filter: filtered = filtered[filtered["db_insurance"]]
 
 filtered["color"] = filtered["risk"].map(RISK_COLOR)
 
-# ── LIVE REFRESH MECHANISM ────────────────────────────────────────────────────
-if auto_refresh:
-    import streamlit.components.v1 as components
-    components.html("""
-    <script>
-        setInterval(function() {
-            window.location.reload();
-        }, 30000);
-    </script>
-    """, height=0)
-
 # ══════════════════════════════════════════════════════════════════════════════
 # HEADER
 # ══════════════════════════════════════════════════════════════════════════════
@@ -372,11 +361,9 @@ st.markdown("---")
 st.markdown('<div class="section-header">GLOBAL VESSEL INTELLIGENCE MAP</div>', unsafe_allow_html=True)
 
 if not filtered.empty:
-    # Prepare map data with all details
+    # Prepare map data
     map_data = filtered[["lat", "lon", "vessel_name", "risk", "flag", "speed_kn", 
-                         "heading", "imo", "mmsi", "type", "region", "ais_dark", 
-                         "spoofed", "sts_detected", "db_ais", "db_satellite", 
-                         "db_sanctions", "db_insurance"]].copy()
+                         "imo", "mmsi", "type", "region"]].copy()
     
     # Risk color mapping
     risk_colors = {
@@ -385,81 +372,36 @@ if not filtered.empty:
         "MEDIUM": "#ffd200",
         "LOW": "#3cdc64"
     }
+    map_data["color"] = map_data["risk"].map(risk_colors)
     
-    # Create hover text with rich details
-    hover_text = []
-    for _, row in map_data.iterrows():
-        databases = []
-        if row["db_ais"]: databases.append("AIS")
-        if row["db_satellite"]: databases.append("SAT")
-        if row["db_sanctions"]: databases.append("SANC")
-        if row["db_insurance"]: databases.append("INS")
-        
-        text = (
-            f"<b>{row['vessel_name']}</b><br>"
-            f"<b>Risk:</b> {row['risk']}<br>"
-            f"<b>Flag:</b> {row['flag']}<br>"
-            f"<b>Type:</b> {row['type']}<br>"
-            f"<b>Speed:</b> {row['speed_kn']} kn<br>"
-            f"<b>Heading:</b> {row['heading']}°<br>"
-            f"<b>IMO:</b> {row['imo']}<br>"
-            f"<b>MMSI:</b> {row['mmsi']}<br>"
-            f"<b>Region:</b> {row['region']}<br>"
-            f"<b>AIS Dark:</b> {'YES' if row['ais_dark'] else 'No'}<br>"
-            f"<b>GPS Spoofed:</b> {'YES' if row['spoofed'] else 'No'}<br>"
-            f"<b>STS Detected:</b> {'YES' if row['sts_detected'] else 'No'}<br>"
-            f"<b>Databases:</b> {', '.join(databases) if databases else 'None'}"
-        )
-        hover_text.append(text)
-    
-    map_data['hover'] = hover_text
-    
-    # Create interactive map
-    fig = go.Figure()
-    
-    # Add markers for each risk level (for better color control)
-    for risk_level in ["CRITICAL", "HIGH", "MEDIUM", "LOW"]:
-        risk_data = map_data[map_data["risk"] == risk_level]
-        if not risk_data.empty:
-            fig.add_trace(go.Scattergeo(
-                lon=risk_data['lon'],
-                lat=risk_data['lat'],
-                mode='markers',
-                marker=dict(
-                    size=10,
-                    color=risk_colors[risk_level],
-                    opacity=0.8,
-                    line=dict(width=1, color='white')
-                ),
-                text=risk_data['hover'],
-                hoverinfo='text',
-                name=risk_level,
-                showlegend=True
-            ))
-    
-    # Update layout
-    fig.update_layout(
-        title="Global Vessel Intelligence Map — Click markers for details",
-        geo=dict(
-            scope='world',
-            projection_type='natural earth',
-            showland=True,
-            landcolor='rgb(30, 40, 70)',
-            coastcolor='rgb(100, 150, 200)',
-            oceancolor='rgb(10, 20, 40)',
-            showocean=True,
-            center=dict(lon=45, lat=25),
-            lataxis_range=[0, 60],
-            lonaxis_range=[0, 120]
-        ),
+    # Create interactive scatter chart using Altair
+    chart = alt.Chart(map_data).mark_circle(size=100).encode(
+        longitude='lon:Q',
+        latitude='lat:Q',
+        color=alt.Color('risk:N', scale=alt.Scale(
+            domain=['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'],
+            range=['#ff2828', '#ff8c00', '#ffd200', '#3cdc64']
+        ), title='Risk Level'),
+        tooltip=[
+            'vessel_name:N',
+            'risk:N',
+            'flag:N',
+            'type:N',
+            'speed_kn:Q',
+            'imo:N',
+            'mmsi:N',
+            'region:N'
+        ]
+    ).properties(
+        width=1000,
         height=600,
-        template='plotly_dark',
-        hovermode='closest',
-        showlegend=True
-    )
+        title='Global Vessel Intelligence Map (Hover for details)'
+    ).project(
+        type='naturalEarth'
+    ).interactive()
     
-    st.plotly_chart(fig, use_container_width=True)
-    st.caption(f"📍 {len(map_data)} vessels tracked | 🔴 Critical | 🟠 High | 🟡 Medium | 🟢 Low | Click markers for details")
+    st.altair_chart(chart, use_container_width=True)
+    st.caption(f"📍 {len(map_data)} vessels tracked | 🔴 Critical | 🟠 High | 🟡 Medium | 🟢 Low | Hover over points for full details")
 else:
     st.info("No vessels match current filters")
 st.markdown("---")
